@@ -10,7 +10,7 @@ Verifing cache
 	
 Tomcat start params
 	...
-	-Djava.util.logging.config.file=C:\Dev\apache-tomcat-7.0.42\conf\JSF_Login.properties
+	-Djava.util.logging.config.file=(path to)\JSF_Login.properties
 	-XX:MaxPermSize=512m
 	-XX:+UnlockCommercialFeatures 
 	-XX:+FlightRecorder
