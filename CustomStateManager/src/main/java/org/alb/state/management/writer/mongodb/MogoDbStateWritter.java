@@ -29,38 +29,19 @@ public class MogoDbStateWritter implements StateWriter{
     }
 
     /* (non-Javadoc)
-     * @see org.alb.state.management.writer.StateWriter#writeState(java.lang.Object, java.lang.Object)
-     */
-    public void writeState(Object id, Object state)
-    {
-	writeStateInner(id,state);
-    }
-
-    /* (non-Javadoc)
      * @see org.alb.state.management.writer.StateWriter#writeStateArray(java.lang.Object, java.lang.Object[])
      */
-    public void writeStateArray(Object id, Object[] state)
+    @Override
+    public void writeState(Object id, Object[] state)
     {
 	writeStateInner(id,state);
-    }
-
-    /* (non-Javadoc)
-     * @see org.alb.state.management.writer.StateWriter#readState(java.lang.Object)
-     */
-    public Object readState(Object id)
-    {
-	DBObject dbObj = readStateInner(id);
-	if (dbObj != null) {
-	    return dbObj.get("state");
-	}
-	return null;
     }
 
     /* (non-Javadoc)
      * @see org.alb.state.management.writer.StateWriter#readStateArray(java.lang.Object)
      */
     @Override
-    public Object[] readStateArray(Object id) 
+    public Object[] readState(Object id) 
     {
 	Object[] result= {};
 	DBObject dbObj = readStateInner(id);

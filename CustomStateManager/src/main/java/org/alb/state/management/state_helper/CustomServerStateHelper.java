@@ -5,6 +5,8 @@ import static com.sun.faces.config.WebConfiguration.BooleanWebContextInitParamet
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.faces.component.NamingContainer;
 import javax.faces.component.UIViewRoot;
@@ -17,6 +19,7 @@ import org.alb.state.management.writer.StateWriter;
 import org.alb.state.management.writer.StateWritterFactory;
 
 import com.sun.faces.renderkit.ServerSideStateHelper;
+import com.sun.faces.util.RequestStateManager;
 import com.sun.faces.util.Util;
 
 /**
@@ -24,11 +27,11 @@ import com.sun.faces.util.Util;
  * @author alorie
  */
 public class CustomServerStateHelper extends ServerSideStateHelper {
-    
+
     private static final String MANAGEMENT_VIEW_STATE = "org.alb.writer.viewState";
-    
+
     StateWriter writer;
-    
+
     /**
      * 
      */
@@ -44,30 +47,30 @@ public class CustomServerStateHelper extends ServerSideStateHelper {
     @Override
     public Object getState(FacesContext ctx, String viewId) {
 
-        String stateId = ServerSideStateHelper.getStateParamValue(ctx);
+	String stateId = ServerSideStateHelper.getStateParamValue(ctx);
 
-        if (stateId == null) {
-            return null;
-        }
+	if (stateId == null) {
+	    return null;
+	}
 
-        if ("stateless".equals(stateId)) {
-            return "stateless";
-        } else {
-            Object[] state = (Object[]) writer.readStateArray(stateId);
-            Object[] restoredState = new Object[2];
-            
-            restoredState[0] = state[0];
-            restoredState[1] = state[1];
-            
-            if(state != null)
-            {
-                if (state.length == 2 && state[1] != null) {
-                    restoredState[1] = handleRestoreState(state[1]);
-                }
-            }
+	if ("stateless".equals(stateId)) {
+	    return "stateless";
+	} else {
+	    Object[] state = (Object[]) writer.readState(stateId);
+	    Object[] restoredState = new Object[2];
 
-            return restoredState;
-        }
+	    restoredState[0] = state[0];
+	    restoredState[1] = state[1];
+
+	    if(state != null)
+	    {
+		if (state.length == 2 && state[1] != null) {
+		    restoredState[1] = handleRestoreState(state[1]);
+		}
+	    }
+
+	    return restoredState;
+	}
     }
 
     /* (non-Javadoc)
@@ -77,13 +80,13 @@ public class CustomServerStateHelper extends ServerSideStateHelper {
     public void writeState(FacesContext ctx,Object state, StringBuilder stateCapture) throws IOException 
     {
 	UIViewRoot viewRoot = ctx.getViewRoot();
-	String stateId;
-	
+	Object stateId;
+
 	if (!viewRoot.isTransient()) 
 	{
 	    String stateString = (String) ((HttpServletRequest)ctx.getExternalContext().getRequest()).getAttribute(MANAGEMENT_VIEW_STATE);
 	    stateId = ServerSideStateHelper.getStateParamValue(ctx);
-	    
+
 	    if (stateString == null) {
 		Util.notNull("state", state);
 		Object[] stateToWrite = (Object[]) state;
@@ -92,9 +95,26 @@ public class CustomServerStateHelper extends ServerSideStateHelper {
 		Object savedState = handleSaveState(stateToWrite[1]);
 
 		if(stateId == null)
-		    stateId = ((HttpServletRequest) ctx.getExternalContext().getRequest()).getSession().getId() + ":" + createRandomId();
-		 
-		writer.writeStateArray(stateId,new Object[]{ structure, savedState });
+		{
+		    String idInLogicalMap = (String) RequestStateManager.get(ctx, RequestStateManager.LOGICAL_VIEW_MAP);
+		    if (idInLogicalMap == null) {
+			idInLogicalMap = ((generateUniqueStateIds) ? createRandomId() : createIncrementalRequestId(ctx));
+		    }
+		    
+		    String idInActualMap = null;
+		    if (ctx.getPartialViewContext().isPartialRequest()) {
+			// If partial request, do not change actual view Id, because page not actually changed.
+			// Otherwise partial requests will soon overflow cache with values that would be never used.
+			idInActualMap = (String) RequestStateManager.get(ctx, RequestStateManager.ACTUAL_VIEW_MAP);
+		    }
+		    if (null == idInActualMap) {
+			idInActualMap = ((generateUniqueStateIds) ? createRandomId() : createIncrementalRequestId(ctx));
+		    }
+
+		    stateId = idInLogicalMap + ':' + idInActualMap; 
+		}
+
+		writer.writeState(stateId,new Object[]{ structure, savedState });
 
 		((HttpServletRequest)ctx.getExternalContext().getRequest()).setAttribute(MANAGEMENT_VIEW_STATE, stateId);
 	    }
@@ -145,10 +165,29 @@ public class CustomServerStateHelper extends ServerSideStateHelper {
 	throw new IllegalStateException("Cannot determine whether or not the request is stateless");
     }
 
+    /**
+     * @param ctx the <code>FacesContext</code> for the current request
+     * @return a unique ID for building the keys used to store
+     *  views within a session
+     */
+    private String createIncrementalRequestId(FacesContext ctx) {
+
+	Map<String, Object> sm = ctx.getExternalContext().getSessionMap();
+	AtomicInteger idgen = (AtomicInteger) sm.get(STATEMANAGED_SERIAL_ID_KEY);
+	if (idgen == null) {
+	    idgen = new AtomicInteger(1);
+	}
+
+	// always call put/setAttribute as we may be in a clustered environment.
+	sm.put(STATEMANAGED_SERIAL_ID_KEY, idgen);
+	return (UIViewRoot.UNIQUE_ID_PREFIX + idgen.getAndIncrement());
+
+    }
+
     private String createRandomId() {
 	return Long.valueOf(random.nextLong()).toString();
     }
-    
+
     /**
      * A simple
      * <code>Writer</code> implementation to encapsulate a
@@ -156,64 +195,64 @@ public class CustomServerStateHelper extends ServerSideStateHelper {
      */
     protected static final class StringBuilderWriter extends Writer {
 
-        private StringBuilder sb;
+	private StringBuilder sb;
 
-        // -------------------------------------------------------- Constructors
-        protected StringBuilderWriter(StringBuilder sb) {
-            this.sb = sb;
-        }
+	// -------------------------------------------------------- Constructors
+	protected StringBuilderWriter(StringBuilder sb) {
+	    this.sb = sb;
+	}
 
-        // ------------------------------------------------- Methods from Writer
-        @Override
-        public void write(int c) throws IOException {
-            sb.append((char) c);
-        }
+	// ------------------------------------------------- Methods from Writer
+	@Override
+	public void write(int c) throws IOException {
+	    sb.append((char) c);
+	}
 
-        @Override
-        public void write(char cbuf[]) throws IOException {
-            sb.append(cbuf);
-        }
+	@Override
+	public void write(char cbuf[]) throws IOException {
+	    sb.append(cbuf);
+	}
 
-        @Override
-        public void write(String str) throws IOException {
-            sb.append(str);
-        }
+	@Override
+	public void write(String str) throws IOException {
+	    sb.append(str);
+	}
 
-        @Override
-        public void write(String str, int off, int len) throws IOException {
-            sb.append(str.toCharArray(), off, len);
-        }
+	@Override
+	public void write(String str, int off, int len) throws IOException {
+	    sb.append(str.toCharArray(), off, len);
+	}
 
-        @Override
-        public Writer append(CharSequence csq) throws IOException {
-            sb.append(csq);
-            return this;
-        }
+	@Override
+	public Writer append(CharSequence csq) throws IOException {
+	    sb.append(csq);
+	    return this;
+	}
 
-        @Override
-        public Writer append(CharSequence csq, int start, int end) throws IOException {
-            sb.append(csq, start, end);
-            return this;
-        }
+	@Override
+	public Writer append(CharSequence csq, int start, int end) throws IOException {
+	    sb.append(csq, start, end);
+	    return this;
+	}
 
-        @Override
-        public Writer append(char c) throws IOException {
-            sb.append(c);
-            return this;
-        }
+	@Override
+	public Writer append(char c) throws IOException {
+	    sb.append(c);
+	    return this;
+	}
 
-        @Override
-        public void write(char cbuf[], int off, int len) throws IOException {
-            sb.append(cbuf, off, len);
-        }
+	@Override
+	public void write(char cbuf[], int off, int len) throws IOException {
+	    sb.append(cbuf, off, len);
+	}
 
-        @Override
-        public void flush() throws IOException {}
+	@Override
+	public void flush() throws IOException {}
 
-        @Override
-        public void close() throws IOException {}
+	@Override
+	public void close() throws IOException {}
     } // END StringBuilderWriter
-    
+
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------

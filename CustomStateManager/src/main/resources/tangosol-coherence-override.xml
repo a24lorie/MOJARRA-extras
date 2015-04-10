@@ -13,6 +13,11 @@
 			<time-to-live system-property="tangosol.coherence.ttl">4</time-to-live>
 		</multicast-listener>
 	</cluster-config>
+    
+    <logging-config>
+        <destination system-property="tangosol.coherence.log">stdout</destination>
+        <severity-level system-property="tangosol.coherence.log.level">7</severity-level>
+    </logging-config>
 
 	<configurable-cache-factory-config>
 		<init-params>

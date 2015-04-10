@@ -22,6 +22,8 @@ public class StateWritterFactory {
 	    }
 	case "coherence":
 	    return StateWriterCoherenceImp.getInstance();
+	case "coherencePof":
+	    return StateWriterCoherenceImp.getInstance();
 	default:
 	    return null;
 	}

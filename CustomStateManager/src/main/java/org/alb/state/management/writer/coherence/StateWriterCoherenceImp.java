@@ -15,7 +15,7 @@ import com.tangosol.net.NamedCache;
 public class StateWriterCoherenceImp implements StateWriter, Serializable
 {
     private static final long serialVersionUID = 2167492606185062311L;
-    
+
     private static StateWriterCoherenceImp instance; 
     private NamedCache cache;
 
@@ -36,20 +36,12 @@ public class StateWriterCoherenceImp implements StateWriter, Serializable
 
 	return instance;
     }
-    
-    /* (non-Javadoc)
-     * @see com.renta4.r4j2ee.jsf.state.StateWriter#readState(java.lang.Object)
-     */
-    public Object[] readState(Object id) 
-    {
-	return null;
-    }
-    
+
     /* (non-Javadoc)
      * @see org.alb.state.management.writer.StateWriter#readStateArray(java.lang.Object)
      */
     @Override
-    public Object[] readStateArray(Object id) 
+    public Object[] readState(Object id) 
     {
 	Object[] result=null;
 
@@ -61,7 +53,7 @@ public class StateWriterCoherenceImp implements StateWriter, Serializable
 	    }
 
 	    result = (Object[]) cache.get(id);
-	    
+
 	    // stop timing
 	    if (timer != null) {
 		timer.stopTiming();
@@ -72,15 +64,10 @@ public class StateWriterCoherenceImp implements StateWriter, Serializable
     }
 
     @Override
-    public void writeState(Object id, Object state) {
-	// TODO Auto-generated method stub
-    }
-
-    @Override
-    public void writeStateArray(Object id, Object[] state) 
+    public void writeState(Object id, Object[] state) 
     {
 	Timer timer = Timer.getInstance();
-	
+
 	if (timer != null) {
 	    timer.startTiming();
 	}
